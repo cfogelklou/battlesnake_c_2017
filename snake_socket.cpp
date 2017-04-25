@@ -18,9 +18,10 @@ typedef int SOCKET;
 #endif
 
 #include "jsmn/jsmn.h"
+
 #include <iostream>
 #include <sstream>
-using namespace std;
+
 
 // ////////////////////////////////////////////////////////////////////////////
 static int sockInit(void)
@@ -65,31 +66,80 @@ static int sockClose(SOCKET sock)
 }
 
 #define DEFAULT_PORT  "27015"
-static const int DEFAULT_BUFLEN = 8192;
+static const int DEFAULT_BUFLEN = 65536;
+
+#define ARRSZ(x) (sizeof(x)/sizeof(x[0]))
+#define MIN(x,y) ((x) < (y)) ? (x) : (y)
+#define MAX(x,y) ((x) > (y)) ? (x) : (y)
 
 // ////////////////////////////////////////////////////////////////////////////
-class SnakeSocketSingleton {
+class SnakeSng {
 public:
-  void SayHi() {
-    cout << "Hi!" << endl;
+  static SnakeSng &inst() {
+    if (NULL == mpInst) {
+      mpInst = new SnakeSng();
+    }
+    return *mpInst;
   }
 
-  SnakeSocketSingleton() {
-    int m = sockInit();
+  void parse(const char *cbuf, const int len) {
+    int err = jsmn_parse(&mParser, cbuf, len, tokens, ARRSZ(tokens));
+
+    for (int i = 0; i < ARRSZ(tokens); i++) {
+      jsmntok_t &t = tokens[i];
+      char token[256];
+      memset(token, 0, sizeof(token));
+      const int cpy = MIN(ARRSZ(token) - 1, t.size);
+      memcpy(token, &cbuf[t.start], cpy);
+      switch (t.type) {
+      case JSMN_UNDEFINED: {
+        std::cout << "undefined" << std::endl;
+      } break;
+      case JSMN_OBJECT: {
+        std::cout << "object" << std::endl;
+      } break;
+      case JSMN_ARRAY: {
+        std::cout << "array" << std::endl;
+      } break;
+      case JSMN_STRING: {
+        std::cout << "string" << std::endl;
+
+      } break;
+      case JSMN_PRIMITIVE: {
+        std::cout << "primitive" << std::endl;
+      } break;
+      default:
+        break;
+      } // Switch
+    }
   }
 
-  ~SnakeSocketSingleton() {
+  SnakeSng() {
+    sockInit();
+    jsmn_init(&mParser);
+  }
+
+  ~SnakeSng() {
     sockQuit();
   }
+
+private:
+
+  jsmn_parser mParser;
+  jsmntok_t tokens[2048];
+  
+  static SnakeSng *mpInst;
+
 };
 
-SnakeSocketSingleton sock;
-
+SnakeSng *SnakeSng::mpInst = NULL;
 
 // ////////////////////////////////////////////////////////////////////////////
 class SnakeMove {
 public:
-  SnakeMove(SnakeImplementationT * pSnake) {
+  SnakeMove(SnakeImplementationT * pSnake)
+    : mpSnake(pSnake)
+  {
     struct addrinfo hints;
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
@@ -101,119 +151,140 @@ public:
     struct addrinfo *result = NULL;
     int iResult = getaddrinfo(NULL, DEFAULT_PORT, &hints, &result);
     if (iResult != 0) {
-      cout << "getaddrinfo failed with error: " << iResult << endl;
+      std::cout << "getaddrinfo failed with error: " << iResult << std::endl;
       return;
     }
 
     // Create a SOCKET for connecting to server
-    {
-      SOCKET ListenSocket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
-      if (ListenSocket == INVALID_SOCKET) {
-        cout << "socket failed with error:" << endl;
-        freeaddrinfo(result);
-        return;
-      }
-
-      // Setup the TCP listening socket
-      iResult = bind(ListenSocket, result->ai_addr, (int)result->ai_addrlen);
-      if (iResult == SOCKET_ERROR) {
-        printf("bind failed with error: %d\n", WSAGetLastError());
-        freeaddrinfo(result);
-        sockClose(ListenSocket);
-        return;
-      }
-
+    ListenSocket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+    if (ListenSocket == INVALID_SOCKET) {
+      std::cout << "socket failed with error:" << std::endl;
       freeaddrinfo(result);
+      return;
+    }
 
-      iResult = listen(ListenSocket, SOMAXCONN);
-      if (iResult == SOCKET_ERROR) {
-        printf("listen failed with error: %d\n", WSAGetLastError());
-        sockClose(ListenSocket);
-        return;
-      }
-
-      // Accept a client socket
-      ClientSocket = accept(ListenSocket, NULL, NULL);
-      if (ClientSocket == INVALID_SOCKET) {
-        printf("accept failed with error: %d\n", WSAGetLastError());
-        sockClose(ListenSocket);
-        return;
-      }
-
-      // No longer need server socket
+    // Setup the TCP listening socket
+    iResult = bind(ListenSocket, result->ai_addr, (int)result->ai_addrlen);
+    if (iResult == SOCKET_ERROR) {
+      printf("bind failed with error: %d\n", WSAGetLastError());
+      freeaddrinfo(result);
       sockClose(ListenSocket);
+      return;
+    }
+
+    freeaddrinfo(result);
+
+    iResult = listen(ListenSocket, SOMAXCONN);
+    if (iResult == SOCKET_ERROR) {
+      printf("listen failed with error: %d\n", WSAGetLastError());
+      sockClose(ListenSocket);
+      return;
+    }
+
+  }
+
+  // //////////////////////////////////////////////////////////////////////////
+  std::string handleReceive(std::string &rxBuf) {
+    const char *cbuf = rxBuf.c_str();
+    const int jsonIdx = rxBuf.find("json", 0);
+    if (jsonIdx >= 0) {
+      const int contentLengthIdx = rxBuf.find("Content-Length", jsonIdx);
+      if (contentLengthIdx >= jsonIdx) {
+        const int bracketIdx = rxBuf.find("{", contentLengthIdx);
+        if (bracketIdx >= 0) {
+          SnakeSng::inst().parse(&cbuf[bracketIdx], rxBuf.length() - jsonIdx);
+        }
+      }
+    }
+    std::string cmd = "{ \"move\":\"up\" }";
+    return cmd;
+
+  }
+
+  // //////////////////////////////////////////////////////////////////////////
+  bool nextMove() {
+    int iResult = 0;
+
+    bool rval = true;
+    
+    // Accept a client socket
+    SOCKET clientSocket = accept(ListenSocket, NULL, NULL);
+    if (clientSocket == INVALID_SOCKET) {
+      printf("accept failed with error: %d\n", WSAGetLastError());
+      //sockClose(ListenSocket);
+      return false;
     }
 
     // Receive until the peer shuts down the connection
     do {
 
-      iResult = recv(ClientSocket, recvbuf, recvbuflen, 0);
+      iResult = recv(clientSocket, recvbuf, recvbuflen, 0);
       if (iResult > 0) {
         printf("Bytes received: %d\n", iResult);
+        std::string rxBuf = recvbuf;
+        std::string response = handleReceive(rxBuf);
 
         // Echo the buffer back to the sender
-        stringstream sstream;
+        std::stringstream sstream;
         sstream << "HTTP / 1.1 200 OK\r\n"
           "Content - Type: application / json\r\n"
           "Content - Length:";
-        std::string cmd = "{ \"move\":\"up\" }";
-        int cmdlen = cmd.length();
-        sstream << cmdlen << "\r\n\r\n";
-        string s = sstream.str();
-        int iSendResult = send(ClientSocket, s.c_str(), s.length(), 0);
+        int cmdlen = response.length();
+        sstream << response << "\r\n\r\n";
+        std::string s = sstream.str();
+        int iSendResult = send(clientSocket, s.c_str(), s.length(), 0);
         if (iSendResult == SOCKET_ERROR) {
           printf("send failed with error: %d\n", WSAGetLastError());
-          sockClose(ClientSocket);
+          sockClose(clientSocket);
         }
         printf("Bytes sent: %d\n", iSendResult);
       }
       else if (iResult == 0) {
-#ifdef _WIN32
-        Sleep(10);
-#else
-        usleep(10 * 1000);
-#endif
+        // Do nothing, just exit...
       }
       else {
         printf("recv failed with error: %d\n", WSAGetLastError());
-        sockClose(ClientSocket);
+        sockClose(clientSocket);
       }
 
-    } while (iResult >= 0);
+    } while (iResult > 0);
 
     // shutdown the connection since we're done
-    iResult = shutdown(ClientSocket, SD_SEND);
+    iResult = sockClose(clientSocket);
     if (iResult == SOCKET_ERROR) {
       printf("shutdown failed with error: %d\n", WSAGetLastError());
-      sockClose(ClientSocket);
+      sockClose(clientSocket);
     }
 
     // cleanup
-    sockClose(ClientSocket);
-    WSACleanup();
+    sockClose(clientSocket);
 
+    return rval;
   }
 
   ~SnakeMove() {
-
+    // No longer need server socket
+    sockClose(ListenSocket);
   }
 
 private:
-  SOCKET ClientSocket = INVALID_SOCKET;
+  SOCKET ListenSocket = INVALID_SOCKET;
+
   char recvbuf[DEFAULT_BUFLEN];
   int recvbuflen = DEFAULT_BUFLEN;
+  SnakeImplementationT *mpSnake;
 
 };
 
 // ////////////////////////////////////////////////////////////////////////////
 extern "C" {
-  void *SnakeAllocAndStart(SnakeImplementationT * pSnake) {
-    sock.SayHi();
-    while (1) {
-      SnakeMove move(pSnake);
+  void *SnakeAllocAndStart(SnakeImplementationT * pSnake) {  
+    (void)SnakeSng::inst();
+    SnakeMove snake(pSnake);
+    while (snake.nextMove()) {
     }
 
-    return NULL;// (void *)new SnakeSocket(pSnake);
+    return NULL;
 
   }
 
@@ -223,3 +294,6 @@ extern "C" {
   }
 
 }
+
+//#define constexpr const
+//#include "nlohmann/src/json.hpp"
