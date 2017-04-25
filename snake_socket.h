@@ -13,8 +13,11 @@ typedef struct SnakeImplementationTag {
   void(*Start)(void);
 } SnakeImplementationT;
 
+// ////////////////////////////////////////////////////////////////////////////
+void * SnakeAllocAndStart(SnakeImplementationT * pSnake);
 
-void * SnakeStart(SnakeImplementationT * pSnake);
+// ////////////////////////////////////////////////////////////////////////////
+void SnakeFree(void *pSnakeRunner);
 
 
 #ifdef __cplusplus
