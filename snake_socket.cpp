@@ -17,6 +17,7 @@
 typedef int SOCKET;
 #endif
 
+#include "jsmn/jsmn.h"
 #include <iostream>
 #include <sstream>
 using namespace std;
@@ -69,7 +70,9 @@ static const int DEFAULT_BUFLEN = 8192;
 // ////////////////////////////////////////////////////////////////////////////
 class SnakeSocketSingleton {
 public:
-
+  void SayHi() {
+    cout << "Hi!" << endl;
+  }
 
   SnakeSocketSingleton() {
     int m = sockInit();
@@ -84,9 +87,9 @@ SnakeSocketSingleton sock;
 
 
 // ////////////////////////////////////////////////////////////////////////////
-class SnakeSocket {
+class SnakeMove {
 public:
-  SnakeSocket() {
+  SnakeMove(SnakeImplementationT * pSnake) {
     struct addrinfo hints;
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
@@ -152,8 +155,6 @@ public:
         stringstream sstream;
         sstream << "HTTP / 1.1 200 OK\r\n"
           "Content - Type: application / json\r\n"
-          "User - Agent: hackney / 1.6.5\r\n"
-          "Host: 192.168.1.241 : 27015\r\n"
           "Content - Length:";
         std::string cmd = "{ \"move\":\"up\" }";
         int cmdlen = cmd.length();
@@ -167,7 +168,11 @@ public:
         printf("Bytes sent: %d\n", iSendResult);
       }
       else if (iResult == 0) {
-        printf("Got 0 bytes \r\n");
+#ifdef _WIN32
+        Sleep(10);
+#else
+        usleep(10 * 1000);
+#endif
       }
       else {
         printf("recv failed with error: %d\n", WSAGetLastError());
@@ -189,7 +194,7 @@ public:
 
   }
 
-  ~SnakeSocket() {
+  ~SnakeMove() {
 
   }
 
@@ -203,14 +208,18 @@ private:
 // ////////////////////////////////////////////////////////////////////////////
 extern "C" {
   void *SnakeAllocAndStart(SnakeImplementationT * pSnake) {
+    sock.SayHi();
+    while (1) {
+      SnakeMove move(pSnake);
+    }
 
-    return (void *)new SnakeSocket();
+    return NULL;// (void *)new SnakeSocket(pSnake);
 
   }
 
   void SnakeFree(void *pSnakeRunner) {
-    SnakeSocket *pSnakeClass = (SnakeSocket *)pSnakeRunner;
-    delete pSnakeClass;
+    //SnakeSocket *pSnakeClass = (SnakeSocket *)pSnakeRunner;
+    //delete pSnakeClass;
   }
 
 }
