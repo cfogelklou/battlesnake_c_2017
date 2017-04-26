@@ -23,8 +23,7 @@ endif (EMSCRIPTEN)
 
 set(APP_SOURCE_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/main.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/snake_socket.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/jsmn/jsmn.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/snake_c_api.cpp
 )
 
 include_directories(

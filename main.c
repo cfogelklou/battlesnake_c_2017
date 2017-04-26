@@ -1,6 +1,6 @@
 // battlesnake_c.cpp : Defines the entry point for the console application.
 //
-#include "snake_socket.h"
+#include "snake_c_api.h"
 #include <stdio.h>
 #include <string.h>
 
