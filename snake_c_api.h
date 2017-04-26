@@ -90,15 +90,17 @@ typedef struct CoordsTag {
   int y;
 } Coords;
 
+// A description of each snake
 typedef struct SnakeTag {
-  char      name[SNAKE_STRLEN + 1];
-  char      taunt[SNAKE_STRLEN + 1];
-  char      id[SNAKE_STRLEN + 1];
-  int       healthPercent;
-  Coords   *coordsArr;
-  int       numCoords;
+  char      name[SNAKE_STRLEN + 1]; // This snake's name.
+  char      taunt[SNAKE_STRLEN + 1]; // This snake's "taunt"
+  char      id[SNAKE_STRLEN + 1]; // The ID of the snake
+  int       healthPercent; // Percentage health
+  Coords   *coordsArr; //< Array of coordinates in x,y
+  int       numCoords; //< Number of coordinates
 } Snake;
 
+// Input you get about how the current snake game looks.
 typedef struct MoveInputTag {
   int         yourSnakeIdx;
   Snake      *snakesArr;
@@ -107,6 +109,8 @@ typedef struct MoveInputTag {
   int         numFood;
 } MoveInput;
 
+
+// Your snake shall set up this struct with its desired direction.
 typedef struct MoveOutputTag {
 
   // Choose a direction for the snake.
@@ -116,9 +120,12 @@ typedef struct MoveOutputTag {
   char            taunt[SNAKE_STRLEN + 1];
 } MoveOutput;
 
+
 // Helper function to allow the pMoveOut struct to be set with a single line of code.
 void SnakeDoMove(MoveOutput *const pMoveOut, const SnakeDirectionE dir, const char * const taunt);
 
+
+// The move function prototype
 typedef void(*SnakeMoveFn)(
 
   // Data that you passed into the call to SnakeSnart().  You might
@@ -152,6 +159,8 @@ typedef struct SnakeCallbacksTag {
 
 
 // ////////////////////////////////////////////////////////////////////////////
+// This is where the magic happens.
+// Call this, and the snake starts waiting for an incoming connection.
 void SnakeStart(
   SnakeCallbacks * const pSnake, 
   const char * const port,

@@ -243,7 +243,6 @@ SnakeMove::~SnakeMove() {
   sockClose(ListenSocket);
 }
 
-using namespace nlohmann;
 
 // ////////////////////////////////////////////////////////////////////////////
 std::string SnakeMove::parseStart(const char * const cbuf) {
@@ -259,7 +258,7 @@ std::string SnakeMove::parseStart(const char * const cbuf) {
   };
 
   try {
-    json req = json::parse(cbuf);
+    nlohmann::json req = nlohmann::json::parse(cbuf);
     if ((mpSnake) && (mpSnake->Start)) {
       const std::string game_id = req["game_id"].get<std::string>();
       auto width = req["width"].get<int>();
@@ -285,7 +284,7 @@ std::string SnakeMove::parseStart(const char * const cbuf) {
   };
   */
 
-  json rval = json::object();
+  nlohmann::json rval = nlohmann::json::object();
   if (strlen(out.color) >= 2) {
     rval["color"] = out.color;
   }
@@ -320,19 +319,20 @@ void from_json(const nlohmann::json& jcoord, Coords& p) {
 
 // ////////////////////////////////////////////////////////////////////////////
 // Convert json coords to coords array
-static void jsonArrToCArr(const json jarr, Coords * &pArr, int &numCoords) {
+static void jsonArrToCArr(const nlohmann::json &jarr, Coords * &pArr, int &numCoords) {
   numCoords = jarr.size();
   if (numCoords > 0) {
     pArr = (Coords *)calloc(numCoords, sizeof(Coords));
 
     int coordsIdx = 0;
-    for (const json coord : jarr) {
+    for (const nlohmann::json coord : jarr) {
       pArr[coordsIdx] = coord.get<Coords>();
       coordsIdx++;
     }
   }
 }
 
+// ////////////////////////////////////////////////////////////////////////////
 void from_json(const nlohmann::json& jsnake, Snake& s) {
 
   if (jsnake["id"].size() > 0) {
@@ -364,7 +364,7 @@ void from_json(const nlohmann::json& jsnake, Snake& s) {
 
 // ////////////////////////////////////////////////////////////////////////////
 std::string SnakeMove::parseMove(const char * const cbuf) {
-  json rval = {
+  nlohmann::json rval = {
     { "move", "up" },
     { "taunt", "ouch" }
   };
@@ -373,7 +373,7 @@ std::string SnakeMove::parseMove(const char * const cbuf) {
     MoveInput moveInput = { 0 };
     MoveOutput moveOutput = { UP };
 
-    const json req = json::parse(cbuf);
+    const nlohmann::json req = nlohmann::json::parse(cbuf);
 
     if ((req["you"].size() <= 0) && (req["snakes"].size() <= 0)) {
       return rval.dump();
@@ -381,7 +381,7 @@ std::string SnakeMove::parseMove(const char * const cbuf) {
 
     const std::string game_id = req["game_id"].get<std::string>();
     const std::string you_uuid = req["you"];
-    const json snakes = req["snakes"];
+    const nlohmann::json snakes = req["snakes"];
 
 #ifdef _DEBUG
     std::cout << "snakes were " << snakes.dump() << std::endl;
@@ -393,7 +393,7 @@ std::string SnakeMove::parseMove(const char * const cbuf) {
 
     // Convert from json to struct.
     int snakeIdx = 0;
-    for (const json jsnake : snakes) {
+    for (const nlohmann::json jsnake : snakes) {
       Snake &destSnake = moveInput.snakesArr[snakeIdx];
       destSnake = jsnake.get<Snake>();
       if (destSnake.id == you_uuid) {
