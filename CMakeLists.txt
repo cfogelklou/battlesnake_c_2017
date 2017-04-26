@@ -3,7 +3,7 @@ project(battlesnake_c)
 
 set(CMAKE_CXX_STANDARD 11)
 
-add_definitions(-D_DEBUG -DDEBUG -D_CONSOLE)
+add_definitions(-D_DEBUG -DDEBUG -D_CONSOLE -DSTANDALONE_JSON)
 
 if (WIN32)
 	add_definitions(-DWIN32)

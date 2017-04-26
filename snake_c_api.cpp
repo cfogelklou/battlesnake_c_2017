@@ -1,4 +1,13 @@
+/**
+* Copyright (c) 2017, Chris Fogelklou
+* All rights reserved.
+*/
+
+#ifdef STANDALONE_JSON
 #include "nlohmann/src/json.hpp"
+#else
+#include <main/json.hpp>
+#endif
 #include "snake_c_api.h"
 
 #ifdef _WIN32
@@ -23,7 +32,6 @@ typedef int SOCKET;
 #include <assert.h>
 
 static const int DEFAULT_BUFLEN = 65536;
-
 
 // ////////////////////////////////////////////////////////////////////////////
 static int sockInit(void) {
@@ -90,7 +98,7 @@ SnakeSng *SnakeSng::mpInst = NULL;
 // ////////////////////////////////////////////////////////////////////////////
 class SnakeMove {
 public:
-  SnakeMove(SnakeImplementationT * pSnake, const char * const port, void * const pUserData);
+  SnakeMove(SnakeCallbacks * pSnake, const char * const port, void * const pUserData);
   ~SnakeMove();
 
   std::string parseStart(const char * const cbuf);
@@ -104,7 +112,7 @@ private:
 
   char recvbuf[DEFAULT_BUFLEN];
   int recvbuflen = DEFAULT_BUFLEN;
-  SnakeImplementationT *mpSnake;
+  SnakeCallbacks *mpSnake;
   void *mpUserData;
 
 };
@@ -154,8 +162,16 @@ const char * SnakeDirStr(const SnakeDirectionE dir) {
 }
 
 // ////////////////////////////////////////////////////////////////////////////
+void SnakeDoMove(MoveOutput *const pMoveOut, const SnakeDirectionE dir, const char * const taunt) {
+  assert(pMoveOut);
+  pMoveOut->dir = dir;
+  strncpy(pMoveOut->taunt, taunt, SNAKE_STRLEN);
+}
+
+
+// ////////////////////////////////////////////////////////////////////////////
 void SnakeStart(
-  SnakeImplementationT * const pSnake, 
+  SnakeCallbacks * const pSnake, 
   const char * const port,
   void * const pUserData ) {
   (void)SnakeSng::inst();
@@ -175,7 +191,7 @@ void SnakeStart(
 
 
 // ////////////////////////////////////////////////////////////////////////////
-SnakeMove::SnakeMove(SnakeImplementationT * pSnake, const char * const port, void * const pUserData)
+SnakeMove::SnakeMove(SnakeCallbacks * pSnake, const char * const port, void * const pUserData)
   : mpSnake(pSnake)
   , mpUserData(pUserData)
 {
@@ -292,19 +308,59 @@ std::string SnakeMove::parseStart(const char * const cbuf) {
   return rval.dump();
 }
 
+
+
 // ////////////////////////////////////////////////////////////////////////////
-static void jsonArrToCArr(const json jarr, CoordsT * &pArr, int &numCoords) {
+// Convert a json coordinate to a Coords struct
+void from_json(const nlohmann::json& jcoord, Coords& p) {
+  p.x = jcoord[0].get<int>();
+  p.y = jcoord[1].get<int>();
+}
+
+
+// ////////////////////////////////////////////////////////////////////////////
+// Convert json coords to coords array
+static void jsonArrToCArr(const json jarr, Coords * &pArr, int &numCoords) {
   numCoords = jarr.size();
   if (numCoords > 0) {
-    pArr = (CoordsT *)calloc(numCoords, sizeof(CoordsT));
+    pArr = (Coords *)calloc(numCoords, sizeof(Coords));
 
     int coordsIdx = 0;
     for (const json coord : jarr) {
-      pArr[coordsIdx].x = coord[0].get<int>();
-      pArr[coordsIdx++].y = coord[1].get<int>();
+      pArr[coordsIdx] = coord.get<Coords>();
+      coordsIdx++;
     }
   }
 }
+
+void from_json(const nlohmann::json& jsnake, Snake& s) {
+
+  if (jsnake["id"].size() > 0) {
+    const std::string id = jsnake["id"].get<std::string>();
+    memcpy(s.id, id.c_str(), SNAKE_STRLEN);
+  }
+
+  if (jsnake["name"].size() > 0) {
+    const std::string name = jsnake["name"].get<std::string>();
+    memcpy(s.name, name.c_str(), SNAKE_STRLEN);
+  }
+
+  if (jsnake["taunt"].size() > 0) {
+    const std::string taunt = jsnake["taunt"].get<std::string>();
+    memcpy(s.taunt, taunt.c_str(), SNAKE_STRLEN);
+  }
+
+  if (jsnake["health_points"].size() > 0) {
+    s.healthPercent = jsnake["health_points"].get<int>();
+  }
+
+  if (jsnake["coords"].size() > 0) {
+    jsonArrToCArr(jsnake["coords"], s.coordsArr, s.numCoords);
+  }
+}
+
+
+
 
 // ////////////////////////////////////////////////////////////////////////////
 std::string SnakeMove::parseMove(const char * const cbuf) {
@@ -314,8 +370,8 @@ std::string SnakeMove::parseMove(const char * const cbuf) {
   };
   try {
 
-    MoveInputT moveInput = { 0 };
-    MoveOutputT moveOutput = { UP };
+    MoveInput moveInput = { 0 };
+    MoveOutput moveOutput = { UP };
 
     const json req = json::parse(cbuf);
 
@@ -333,45 +389,27 @@ std::string SnakeMove::parseMove(const char * const cbuf) {
 #endif
 
     moveInput.numSnakes = snakes.size();
-    moveInput.snakesArr = (SnakeInfoT *)calloc(moveInput.numSnakes, sizeof(SnakeInfoT));
+    moveInput.snakesArr = (Snake *)calloc(moveInput.numSnakes, sizeof(Snake));
 
+    // Convert from json to struct.
     int snakeIdx = 0;
-    for (const json snake : snakes) {
-      std::string id = you_uuid;
-      SnakeInfoT &destSnake = moveInput.snakesArr[snakeIdx++];
-
-      if (snake["id"].size() > 0) {
-        id = snake["id"].get<std::string>();
-      }
-
-      if (id == you_uuid) {
+    for (const json jsnake : snakes) {
+      Snake &destSnake = moveInput.snakesArr[snakeIdx];
+      destSnake = jsnake.get<Snake>();
+      if (destSnake.id == you_uuid) {
         moveInput.yourSnakeIdx = snakeIdx;
       }
-
-      if (snake["name"].size() > 0) {
-        const std::string name = snake["name"].get<std::string>();
-        memcpy(destSnake.name, name.c_str(), SNAKE_STRLEN);
-      }
-
-      if (snake["taunt"].size() > 0) {
-        const std::string taunt = snake["taunt"].get<std::string>();
-        memcpy(destSnake.taunt, taunt.c_str(), SNAKE_STRLEN);
-      }
-
-      memcpy(destSnake.id, id.c_str(), SNAKE_STRLEN);
-
-      if (snake["health_points"].size() > 0) {
-        destSnake.healthPercent = snake["health_points"].get<int>();
-      }
-
-      jsonArrToCArr(snake["coords"], destSnake.coordsArr, destSnake.numCoords);
-
+      snakeIdx++;
     }
 
+    // Convert food to a C array.
     jsonArrToCArr(req["food"], moveInput.foodArr, moveInput.numFood);
 
+    // If the move function is defined, call it.
     if ((mpSnake) && (mpSnake->Move)) {
       mpSnake->Move(mpUserData, game_id.c_str(), &moveInput, &moveOutput);
+      
+      // Handle output of the move call
       rval["move"] = SnakeDirStr(moveOutput.dir);
       if (strlen(moveOutput.taunt) >= 1) {
         rval["taunt"] = moveOutput.taunt;
@@ -383,16 +421,18 @@ std::string SnakeMove::parseMove(const char * const cbuf) {
       free(moveInput.foodArr);
     }
 
-    // Free allocated snake coordinates.
-    for (int snakeIdx = 0; snakeIdx < moveInput.numSnakes; snakeIdx++) {
-      SnakeInfoT &snake = moveInput.snakesArr[snakeIdx];
-      if (snake.coordsArr) {
-        free(snake.coordsArr);
-      }
-    }
-
-    // Free snakes array.
+    // Free the snakes array.
     if (moveInput.snakesArr) {
+
+      // Free allocated snake coordinates.
+      for (int snakeIdx = 0; snakeIdx < moveInput.numSnakes; snakeIdx++) {
+        Snake &snake = moveInput.snakesArr[snakeIdx];
+        if (snake.coordsArr) {
+          free(snake.coordsArr);
+        }
+      }
+
+      // Free snakes array.
       free(moveInput.snakesArr);
     }
   }
@@ -441,7 +481,6 @@ bool SnakeMove::nextMove() {
   SOCKET clientSocket = accept(ListenSocket, NULL, NULL);
   if (clientSocket == INVALID_SOCKET) {
     printf("accept failed with error: %d\n", WSAGetLastError());
-    //sockClose(ListenSocket);
     return false;
   }
 

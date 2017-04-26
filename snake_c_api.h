@@ -88,54 +88,72 @@ const char * SnakeDirStr(const SnakeDirectionE dir);
 typedef struct CoordsTag {
   int x;
   int y;
-} CoordsT;
+} Coords;
 
-
-typedef struct SnakeInfoTag {
+typedef struct SnakeTag {
   char      name[SNAKE_STRLEN + 1];
   char      taunt[SNAKE_STRLEN + 1];
   char      id[SNAKE_STRLEN + 1];
   int       healthPercent;
-  CoordsT  *coordsArr;
+  Coords   *coordsArr;
   int       numCoords;
-} SnakeInfoT;
+} Snake;
 
 typedef struct MoveInputTag {
   int         yourSnakeIdx;
-  SnakeInfoT *snakesArr;
+  Snake      *snakesArr;
   int         numSnakes;
-  CoordsT    *foodArr;
+  Coords     *foodArr;
   int         numFood;
-} MoveInputT;
+} MoveInput;
 
 typedef struct MoveOutputTag {
+
+  // Choose a direction for the snake.
   SnakeDirectionE dir;
+
+  // Choose a taunt for the snake.
   char            taunt[SNAKE_STRLEN + 1];
-} MoveOutputT;
+} MoveOutput;
+
+// Helper function to allow the pMoveOut struct to be set with a single line of code.
+void SnakeDoMove(MoveOutput *const pMoveOut, const SnakeDirectionE dir, const char * const taunt);
 
 typedef void(*SnakeMoveFn)(
+
+  // Data that you passed into the call to SnakeSnart().  You might
+  // not need this..
   void * const pUserData,
+  
+  // The ID of the game that wants you to move.  Not really important.
   const char * const pGameId,
-  const MoveInputT * const pMoveInput,
+  
+  // Data you will need to determine where to move.
+  const MoveInput * const pMoveInput,
 
   // Your snake logic needs to update this structure.
-  MoveOutputT * const pMoveOutput
+  MoveOutput * const pMoveOutput
 );
 
-typedef struct SnakeImplementationTag {
 
-  SnakeStartFn Start;
+// The snake "brains" are here, provided by the competitor.
+typedef struct SnakeCallbacksTag {
 
-  SnakeMoveFn Move;
+  // Called when the game starts.
+  SnakeStartFn  Start;
 
-} SnakeImplementationT;
+  // Called when a new move is requested.  
+  // Be quick, or you'll miss your chance!
+  SnakeMoveFn   Move;
+
+} SnakeCallbacks;
 
 
 
 
 // ////////////////////////////////////////////////////////////////////////////
 void SnakeStart(
-  SnakeImplementationT * const pSnake, 
+  SnakeCallbacks * const pSnake, 
   const char * const port,
   void * const pUserData);
 
