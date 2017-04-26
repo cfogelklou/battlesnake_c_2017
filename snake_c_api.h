@@ -3,7 +3,7 @@
 
 #define SNAKE_STRLEN 80
 
-#define DEFAULT_PORT  "27015"
+#define DEFAULT_PORT  "8080"
 #define ARRSZ(x) (sizeof(x)/sizeof(x[0]))
 #define MIN(x,y) ((x) < (y)) ? (x) : (y)
 #define MAX(x,y) ((x) > (y)) ? (x) : (y)
@@ -25,9 +25,6 @@ typedef enum SnakeHeadTypeTag {
   SH_TONGUE
 } SnakeHeadTypeE;
 
-// Get a character string for the current direction.
-const char * SnakeHeadStr(const SnakeHeadTypeE head);
-
 typedef enum SnakeTailTypeTag {
   ST_SMALL_RATTLE,
   ST_SKINNY_TAIL,
@@ -39,9 +36,6 @@ typedef enum SnakeTailTypeTag {
   ST_CURLED,
   ST_BLOCK_BUM
 } SnakeTailTypeE;
-
-// Get a character string for the current direction.
-const char * SnakeTailStr(const SnakeTailTypeE tail);
 
 typedef struct StartOutputTag {
   // Format: "#ff0000, "gold", "rgb(255, 255, 255)", etc..
@@ -74,16 +68,13 @@ typedef void(*SnakeStartFn)(
   StartOutputT * const pStartOutput
 );
 
-
+// Snake directions
 typedef enum {
   UP = 0,
   LEFT = 1,
   DOWN = 2,
   RIGHT = 3
 } SnakeDirectionE;
-
-// Get a character string for the current direction.
-const char * SnakeDirStr(const SnakeDirectionE dir);
 
 typedef struct CoordsTag {
   int x;
@@ -102,11 +93,13 @@ typedef struct SnakeTag {
 
 // Input you get about how the current snake game looks.
 typedef struct MoveInputTag {
-  int         yourSnakeIdx;
-  Snake      *snakesArr;
-  int         numSnakes;
-  Coords     *foodArr;
-  int         numFood;
+  int         width; // width of the board
+  int         height; // height of the board
+  int         yourSnakeIdx; // The index of your snake in snakesArr
+  Snake      *snakesArr; // Array of snakes, including yours.
+  int         numSnakes; // Number of snakes in snakesArr
+  Coords     *foodArr; // Array of available food coordinates
+  int         numFood; // Number of food(s??)
 } MoveInput;
 
 
@@ -119,11 +112,6 @@ typedef struct MoveOutputTag {
   // Choose a taunt for the snake.
   char            taunt[SNAKE_STRLEN + 1];
 } MoveOutput;
-
-
-// Helper function to allow the pMoveOut struct to be set with a single line of code.
-void SnakeDoMove(MoveOutput *const pMoveOut, const SnakeDirectionE dir, const char * const taunt);
-
 
 // The move function prototype
 typedef void(*SnakeMoveFn)(
@@ -154,7 +142,6 @@ typedef struct SnakeCallbacksTag {
   SnakeMoveFn   Move;
 
 } SnakeCallbacks;
-
 
 
 

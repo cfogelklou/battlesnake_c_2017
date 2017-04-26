@@ -3,16 +3,12 @@
 * All rights reserved.
 */
 
-#ifdef STANDALONE_JSON
-#include "nlohmann/src/json.hpp"
-#else
-#include <main/json.hpp>
-#endif
+
 #include "snake_c_api.h"
+#include "snake_c_utils.h"
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
-/* See http://stackoverflow.com/questions/12765743/getaddrinfo-on-win32 */
 #ifndef _WIN32_WINNT
 #define _WIN32_WINNT 0x0501  /* Windows XP. */
 #endif
@@ -29,6 +25,12 @@ typedef int SOCKET;
 #define SOCKET_ERROR            (-1)
 #endif
 
+#ifdef STANDALONE_JSON
+#include "nlohmann/src/json.hpp"
+#else
+#include <main/json.hpp>
+#endif
+
 #include <iostream>
 #include <sstream>
 #include <assert.h>
@@ -36,43 +38,10 @@ typedef int SOCKET;
 static const int DEFAULT_BUFLEN = 65536;
 
 // ////////////////////////////////////////////////////////////////////////////
-static int sockInit(void) {
-#ifdef _WIN32
-  WSADATA wsa_data;
-  return WSAStartup(MAKEWORD(1, 1), &wsa_data);
-#else
-  return 0;
-#endif
-}
-
-// ////////////////////////////////////////////////////////////////////////////
-static int sockQuit(void) {
-#ifdef _WIN32
-  return WSACleanup();
-#else
-  return 0;
-#endif
-}
-
-// ////////////////////////////////////////////////////////////////////////////
-static int sockClose(SOCKET sock) {
-
-  int status = 0;
-
-#ifdef _WIN32
-  status = shutdown(sock, SD_BOTH);
-  if (status == 0) { status = closesocket(sock); }
-#else
-  status = shutdown(sock, SHUT_RDWR);
-  if (status == 0) { status = close(sock); }
-#endif
-
-  return status;
-}
-
-// ////////////////////////////////////////////////////////////////////////////
 class SnakeSng {
 public:
+
+  // Singleton getter
   static SnakeSng &inst() {
     if (NULL == mpInst) {
       mpInst = new SnakeSng();
@@ -80,28 +49,48 @@ public:
     return *mpInst;
   }
 
+  // Constructor.  Init sockets.
   SnakeSng() {
-    sockInit();
+#ifdef _WIN32
+    WSADATA wsa_data;
+    WSAStartup(MAKEWORD(1, 1), &wsa_data);
+#else
+    return 0;
+#endif
   }
 
+  // Destructor, deinit sockets.
   ~SnakeSng() {
-    sockQuit();
+#ifdef _WIN32
+    WSACleanup();    
+#endif
+  }
+
+  // Close a socket.
+  int sockClose(const SOCKET sock) {
+    int status = 0;
+#ifdef _WIN32
+    status = shutdown(sock, SD_BOTH);
+    if (status == 0) { status = closesocket(sock); }
+#else
+    status = shutdown(sock, SHUT_RDWR);
+    if (status == 0) { status = close(sock); }
+#endif
+    return status;
   }
 
 private:
-
-
   static SnakeSng *mpInst;
-
 };
 
+// Singleton instance
 SnakeSng *SnakeSng::mpInst = NULL;
 
 // ////////////////////////////////////////////////////////////////////////////
-class SnakeMove {
+class SnakeMoveListener {
 public:
-  SnakeMove(const SnakeCallbacks * const pSnake, const char * const port, void * const pUserData);
-  ~SnakeMove();
+  SnakeMoveListener(const SnakeCallbacks * const pSnake, const char * const port, void * const pUserData);
+  ~SnakeMoveListener();
 
   std::string parseStart(const char * const cbuf);
   std::string parseMove(const char * const cbuf);
@@ -119,81 +108,9 @@ private:
 
 };
 
-extern "C" {
-
-// Get a string for the current direction.
-const char * SnakeHeadStr(const SnakeHeadTypeE head) {
-  switch (head) {
-    case SH_BENDR: return "bendr";
-    case SH_DEAD: return "dead";
-    case SH_FANG: return "fang";
-    case SH_PIXEL: return "pixel";
-    case SH_REGULAR: return "regular";
-    case SH_SAFE: return "safe";
-    case SH_SAND_WORM: return "sand-worm";
-    case SH_SHADES: return "shades";
-    case SH_SMILE: return "smile";
-    default: return "tongue";
-  }
-}
-
-
-// Get a string for the current direction.
-const char * SnakeTailStr(const SnakeTailTypeE tail) {
-  switch (tail) {
-    case ST_SMALL_RATTLE: return "small-rattle";
-    case ST_SKINNY_TAIL: return "skinny-tail";
-    case ST_ROUND_BUM: return "round-bum";
-    case ST_REGULAR: return "regular";
-    case ST_PIXEL: return "pixel";
-    case ST_FRECKLED: return "freckled";
-    case ST_FAT_RATTLE: return "fat-rattle";
-    case ST_CURLED: return "curled";
-    default: return "block-bum";
-  }
-}
 
 // ////////////////////////////////////////////////////////////////////////////
-const char * SnakeDirStr(const SnakeDirectionE dir) {
-  switch (dir) {
-  case UP: return "up";
-  case DOWN: return "down";
-  case LEFT: return "left";
-  default: return "right";
-  };
-}
-
-// ////////////////////////////////////////////////////////////////////////////
-void SnakeDoMove(MoveOutput *const pMoveOut, const SnakeDirectionE dir, const char * const taunt) {
-  assert(pMoveOut);
-  pMoveOut->dir = dir;
-  strncpy(pMoveOut->taunt, taunt, SNAKE_STRLEN);
-}
-
-
-// ////////////////////////////////////////////////////////////////////////////
-void SnakeStart(
-  const SnakeCallbacks * const pSnake,
-  const char * const port,
-  void * const pUserData ) {
-  (void)SnakeSng::inst();
-
-  assert(pSnake);
-  assert(port);
-
-  SnakeMove snake(pSnake, port, pUserData);
-
-  while (snake.nextMove()) {;}
-}
-
-
-} // extern "C" {
-
-
-
-
-// ////////////////////////////////////////////////////////////////////////////
-SnakeMove::SnakeMove(const SnakeCallbacks * const pSnake, const char * const port, void * const pUserData)
+SnakeMoveListener::SnakeMoveListener(const SnakeCallbacks * const pSnake, const char * const port, void * const pUserData)
   : mpSnake(pSnake)
   , mpUserData(pUserData)
 {
@@ -225,7 +142,7 @@ SnakeMove::SnakeMove(const SnakeCallbacks * const pSnake, const char * const por
   if (iResult == SOCKET_ERROR) {
     std::cerr << "listen failed with error" << std::endl;
     freeaddrinfo(result);
-    sockClose(ListenSocket);
+    SnakeSng::inst().sockClose(ListenSocket);
     return;
   }
 
@@ -234,22 +151,21 @@ SnakeMove::SnakeMove(const SnakeCallbacks * const pSnake, const char * const por
   iResult = listen(ListenSocket, SOMAXCONN);
   if (iResult == SOCKET_ERROR) {
     std::cerr << "listen failed with error" << std::endl;
-    sockClose(ListenSocket);
+    SnakeSng::inst().sockClose(ListenSocket);
     return;
   }
 }
 
 // ////////////////////////////////////////////////////////////////////////////
-SnakeMove::~SnakeMove() {
+SnakeMoveListener::~SnakeMoveListener() {
   // No longer need server socket
-  sockClose(ListenSocket);
+  SnakeSng::inst().sockClose(ListenSocket);
 }
 
 
 // ////////////////////////////////////////////////////////////////////////////
-std::string SnakeMove::parseStart(const char * const cbuf) {
+std::string SnakeMoveListener::parseStart(const char * const cbuf) {
 
-  
   StartOutputT out = {
     "red",
     "white",
@@ -275,17 +191,7 @@ std::string SnakeMove::parseStart(const char * const cbuf) {
     std::cerr << "ERROR in /start: Unknown exception caught." << std::endl;
   }
 
-  /*
-  json rval = {
-  { "color", "#FF0000" },
-  { "secondary_color", "#00FF00" },
-  { "name", "Basic snake" },
-  { "taunt", "I'm hungry!" },
-  { "head_type", "pixel" },
-  { "tail_type", "pixel" }
-  };
-  */
-
+  // Create return value
   nlohmann::json rval = nlohmann::json::object();
   if (strlen(out.color) >= 2) {
     rval["color"] = out.color;
@@ -362,50 +268,53 @@ void from_json(const nlohmann::json& jsnake, Snake& s) {
 }
 
 // ////////////////////////////////////////////////////////////////////////////
-std::string SnakeMove::parseMove(const char * const cbuf) {
+std::string SnakeMoveListener::parseMove(const char * const cbuf) {
   nlohmann::json rval = {
     { "move", "up" },
     { "taunt", "ouch" }
   };
   try {
 
-    MoveInput moveInput = { 0 };
-    MoveOutput moveOutput = { UP };
-
-    const nlohmann::json req = nlohmann::json::parse(cbuf);
-
-    if ((req["you"].size() <= 0) && (req["snakes"].size() <= 0)) {
-      return rval.dump();
-    }
-
-    const std::string game_id = req["game_id"].get<std::string>();
-    const std::string you_uuid = req["you"];
-    const nlohmann::json snakes = req["snakes"];
-
-#ifdef _DEBUG
-    std::cout << "snakes were " << snakes.dump() << std::endl;
-    std::cout << std::endl;
-#endif
-
-    moveInput.numSnakes = snakes.size();
-    moveInput.snakesArr = (Snake *)calloc(moveInput.numSnakes, sizeof(Snake));
-
-    // Convert from json to struct.
-    int snakeIdx = 0;
-    for (const nlohmann::json jsnake : snakes) {
-      Snake &destSnake = moveInput.snakesArr[snakeIdx];
-      destSnake = jsnake.get<Snake>();
-      if (destSnake.id == you_uuid) {
-        moveInput.yourSnakeIdx = snakeIdx;
-      }
-      snakeIdx++;
-    }
-
-    // Convert food to a C array.
-    jsonArrToCArr(req["food"], moveInput.foodArr, moveInput.numFood);
-
     // If the move function is defined, call it.
     if ((mpSnake) && (mpSnake->Move)) {
+      MoveInput moveInput = { 0 };
+      MoveOutput moveOutput = { UP };
+
+      const nlohmann::json req = nlohmann::json::parse(cbuf);
+
+      if ((req["you"].size() <= 0) && (req["snakes"].size() <= 0)) {
+        return rval.dump();
+      }
+
+      const std::string game_id = req["game_id"].get<std::string>();
+      const std::string you_uuid = req["you"];
+      const nlohmann::json snakes = req["snakes"];
+
+#ifdef _DEBUG
+      std::cout << "snakes were " << snakes.dump() << std::endl;
+      std::cout << std::endl;
+#endif
+
+      moveInput.numSnakes = snakes.size();
+      moveInput.snakesArr = (Snake *)calloc(moveInput.numSnakes, sizeof(Snake));
+
+      // Convert from json to struct.
+      int snakeIdx = 0;
+      for (const nlohmann::json jsnake : snakes) {
+        Snake &destSnake = moveInput.snakesArr[snakeIdx];
+        destSnake = jsnake.get<Snake>();
+        if (destSnake.id == you_uuid) {
+          moveInput.yourSnakeIdx = snakeIdx;
+        }
+        snakeIdx++;
+      }
+
+      // Convert food to a C array.
+      jsonArrToCArr(req["food"], moveInput.foodArr, moveInput.numFood);
+
+      moveInput.width = req["width"].get<int>();
+      moveInput.height = req["height"].get<int>();
+
       mpSnake->Move(mpUserData, game_id.c_str(), &moveInput, &moveOutput);
       
       // Handle output of the move call
@@ -413,26 +322,26 @@ std::string SnakeMove::parseMove(const char * const cbuf) {
       if (strlen(moveOutput.taunt) >= 1) {
         rval["taunt"] = moveOutput.taunt;
       }
-    }
 
-    // Free allocated food.
-    if (moveInput.foodArr) {
-      free(moveInput.foodArr);
-    }
-
-    // Free the snakes array.
-    if (moveInput.snakesArr) {
-
-      // Free allocated snake coordinates.
-      for (int snakeIdx = 0; snakeIdx < moveInput.numSnakes; snakeIdx++) {
-        Snake &snake = moveInput.snakesArr[snakeIdx];
-        if (snake.coordsArr) {
-          free(snake.coordsArr);
-        }
+      // Free allocated food.
+      if (moveInput.foodArr) {
+        free(moveInput.foodArr);
       }
 
-      // Free snakes array.
-      free(moveInput.snakesArr);
+      // Free the snakes array.
+      if (moveInput.snakesArr) {
+
+        // Free allocated snake coordinates.
+        for (int snakeIdx = 0; snakeIdx < moveInput.numSnakes; snakeIdx++) {
+          Snake &snake = moveInput.snakesArr[snakeIdx];
+          if (snake.coordsArr) {
+            free(snake.coordsArr);
+          }
+        }
+
+        // Free snakes array.
+        free(moveInput.snakesArr);
+      }
     }
   }
   catch (std::exception& e) {
@@ -446,7 +355,7 @@ std::string SnakeMove::parseMove(const char * const cbuf) {
 
 
 // //////////////////////////////////////////////////////////////////////////
-std::string SnakeMove::handleReceive(std::string &rxBuf, const int recvbuflen) {
+std::string SnakeMoveListener::handleReceive(std::string &rxBuf, const int recvbuflen) {
   const char *cbuf = rxBuf.c_str();
   const int jsonIdx = rxBuf.find("json", 0);
   std::string rval = "{ \"move\":\"up\" }";
@@ -471,7 +380,7 @@ std::string SnakeMove::handleReceive(std::string &rxBuf, const int recvbuflen) {
 }
 
 // //////////////////////////////////////////////////////////////////////////
-bool SnakeMove::nextMove() {
+bool SnakeMoveListener::nextMove() {
   int iResult = 0;
 
   bool rval = true;
@@ -504,7 +413,7 @@ bool SnakeMove::nextMove() {
       int iSendResult = send(clientSocket, s.c_str(), s.length(), 0);
       if (iSendResult == SOCKET_ERROR) {
         std::cerr << "send failed with error" << std::endl;
-        sockClose(clientSocket);
+        SnakeSng::inst().sockClose(clientSocket);
       }
       printf("Bytes sent: %d\n", iSendResult);
     }
@@ -513,21 +422,45 @@ bool SnakeMove::nextMove() {
     }
     else {
       std::cerr << "recv failed with error" << std::endl;
-      sockClose(clientSocket);
+      SnakeSng::inst().sockClose(clientSocket);
     }
 
   } while (iResult > 0);
 
   // shutdown the connection since we're done
-  iResult = sockClose(clientSocket);
+  iResult = SnakeSng::inst().sockClose(clientSocket);
   if (iResult == SOCKET_ERROR) {
     std::cerr << "shutdown failed with error" << std::endl;
-    sockClose(clientSocket);
+    SnakeSng::inst().sockClose(clientSocket);
   }
 
   // cleanup
-  sockClose(clientSocket);
+  SnakeSng::inst().sockClose(clientSocket);
 
   return rval;
 }
 
+
+
+
+
+
+extern "C" {
+
+// ////////////////////////////////////////////////////////////////////////////
+void SnakeStart(
+  const SnakeCallbacks * const pSnake,
+  const char * const port,
+  void * const pUserData) {
+  (void)SnakeSng::inst();
+
+  assert(pSnake);
+  assert(port);
+
+  SnakeMoveListener snake(pSnake, port, pUserData);
+
+  while (snake.nextMove()) { ; }
+}
+
+
+} // extern "C" {
