@@ -25,6 +25,8 @@
 #include <netdb.h>  /* Needed for getaddrinfo() and freeaddrinfo() */
 #include <unistd.h> /* Needed for close() */
 typedef int SOCKET;
+#define INVALID_SOCKET  (SOCKET)(~0)
+#define SOCKET_ERROR            (-1)
 #endif
 
 #include <iostream>
@@ -98,7 +100,7 @@ SnakeSng *SnakeSng::mpInst = NULL;
 // ////////////////////////////////////////////////////////////////////////////
 class SnakeMove {
 public:
-  SnakeMove(SnakeCallbacks * pSnake, const char * const port, void * const pUserData);
+  SnakeMove(const SnakeCallbacks * const pSnake, const char * const port, void * const pUserData);
   ~SnakeMove();
 
   std::string parseStart(const char * const cbuf);
@@ -112,7 +114,7 @@ private:
 
   char recvbuf[DEFAULT_BUFLEN];
   int recvbuflen = DEFAULT_BUFLEN;
-  SnakeCallbacks *mpSnake;
+  const SnakeCallbacks *mpSnake;
   void *mpUserData;
 
 };
@@ -171,7 +173,7 @@ void SnakeDoMove(MoveOutput *const pMoveOut, const SnakeDirectionE dir, const ch
 
 // ////////////////////////////////////////////////////////////////////////////
 void SnakeStart(
-  SnakeCallbacks * const pSnake, 
+  const SnakeCallbacks * const pSnake,
   const char * const port,
   void * const pUserData ) {
   (void)SnakeSng::inst();
@@ -191,7 +193,7 @@ void SnakeStart(
 
 
 // ////////////////////////////////////////////////////////////////////////////
-SnakeMove::SnakeMove(SnakeCallbacks * pSnake, const char * const port, void * const pUserData)
+SnakeMove::SnakeMove(const SnakeCallbacks * const pSnake, const char * const port, void * const pUserData)
   : mpSnake(pSnake)
   , mpUserData(pUserData)
 {
@@ -359,9 +361,6 @@ void from_json(const nlohmann::json& jsnake, Snake& s) {
   }
 }
 
-
-
-
 // ////////////////////////////////////////////////////////////////////////////
 std::string SnakeMove::parseMove(const char * const cbuf) {
   nlohmann::json rval = {
@@ -480,7 +479,7 @@ bool SnakeMove::nextMove() {
   // Accept a client socket
   SOCKET clientSocket = accept(ListenSocket, NULL, NULL);
   if (clientSocket == INVALID_SOCKET) {
-    printf("accept failed with error: %d\n", WSAGetLastError());
+    std::cerr << "accept failed with error" << std::endl;
     return false;
   }
 
@@ -504,7 +503,7 @@ bool SnakeMove::nextMove() {
       const std::string s = sstream.str();
       int iSendResult = send(clientSocket, s.c_str(), s.length(), 0);
       if (iSendResult == SOCKET_ERROR) {
-        printf("send failed with error: %d\n", WSAGetLastError());
+        std::cerr << "send failed with error" << std::endl;
         sockClose(clientSocket);
       }
       printf("Bytes sent: %d\n", iSendResult);
@@ -513,7 +512,7 @@ bool SnakeMove::nextMove() {
       // Do nothing, just exit...
     }
     else {
-      printf("recv failed with error: %d\n", WSAGetLastError());
+      std::cerr << "recv failed with error" << std::endl;
       sockClose(clientSocket);
     }
 
@@ -522,7 +521,7 @@ bool SnakeMove::nextMove() {
   // shutdown the connection since we're done
   iResult = sockClose(clientSocket);
   if (iResult == SOCKET_ERROR) {
-    printf("shutdown failed with error: %d\n", WSAGetLastError());
+    std::cerr << "shutdown failed with error" << std::endl;
     sockClose(clientSocket);
   }
 
@@ -531,3 +530,4 @@ bool SnakeMove::nextMove() {
 
   return rval;
 }
+

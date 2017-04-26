@@ -162,7 +162,7 @@ typedef struct SnakeCallbacksTag {
 // This is where the magic happens.
 // Call this, and the snake starts waiting for an incoming connection.
 void SnakeStart(
-  SnakeCallbacks * const pSnake, 
+  const SnakeCallbacks * const pSnake,
   const char * const port,
   void * const pUserData);
 
