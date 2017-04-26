@@ -2,6 +2,7 @@
 #include "snake_c_utils.h"
 #include <stddef.h>
 #include <stdio.h>
+#include <string.h>
 
 #ifdef __cplusplus
 extern "C" {

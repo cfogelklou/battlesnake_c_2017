@@ -54,8 +54,6 @@ public:
 #ifdef _WIN32
     WSADATA wsa_data;
     WSAStartup(MAKEWORD(1, 1), &wsa_data);
-#else
-    return 0;
 #endif
   }
 
