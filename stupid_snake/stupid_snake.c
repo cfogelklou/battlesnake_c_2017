@@ -20,9 +20,9 @@ static void snake_start(
   printf("Started game %s with width %d and height %d!\r\n", pGameId, width, height);
 
   // Fill in the snake info
-  strncpy(pStartOutput->color, "white", SNAKE_STRLEN);
+  strncpy(pStartOutput->color, "blue", SNAKE_STRLEN);
   strncpy(pStartOutput->secondary_color, "red", SNAKE_STRLEN);
-  strncpy(pStartOutput->name, "Dorky C McDorkerface", SNAKE_STRLEN);
+  strncpy(pStartOutput->name, "Dorky C McDumberface", SNAKE_STRLEN);
   strncpy(pStartOutput->taunt, "I'm a gonna getcha!", SNAKE_STRLEN);
 
   pStartOutput->head_type = SH_TONGUE;
