@@ -20,9 +20,9 @@ static void snake_start(
   printf("Started game %s with width %d and height %d!\r\n", pGameId, width, height);
 
   // Fill in the snake info
-  strncpy(pStartOutput->color, "white", SNAKE_STRLEN);
+  strncpy(pStartOutput->color, "blue", SNAKE_STRLEN);
   strncpy(pStartOutput->secondary_color, "red", SNAKE_STRLEN);
-  strncpy(pStartOutput->name, "Dorky C McDorkerface", SNAKE_STRLEN);
+  strncpy(pStartOutput->name, "Dorky C McDumberface", SNAKE_STRLEN);
   strncpy(pStartOutput->taunt, "I'm a gonna getcha!", SNAKE_STRLEN);
 
   pStartOutput->head_type = SH_TONGUE;
@@ -41,7 +41,7 @@ static void snake_move(
   printf("Got move for game %s!\r\n", pGameId);
 
   if (pMoveInput->numFood <= 0) {
-    SnakeDoMove(pMoveOutput, DOWN, "No food!  Let's go DOOOWN!");
+    SnakeDoMove(pMoveOutput, DIR_DOWN, "No food!  Let's go DOOOWN!");
   }
   else {
 
@@ -52,17 +52,22 @@ static void snake_move(
     printf("my pos: [%d,%d] food:[%d,%d]\r\n",
       head.x, head.y, food0.x, food0.y);
 
+    // Print the current battlefield.
+    Battlefield * const pB = SnakeBattlefieldAllocAndUpdate(pMoveInput);
+    SnakeBattlefieldPrint(pB);
+    SnakeBattlefieldFree(pB);
+
     if (food0.y > head.y) {
-      SnakeDoMove(pMoveOutput, DOWN, "Watch out! Going down!!!");
+      SnakeDoMove(pMoveOutput, DIR_DOWN, "Watch out! Going down!!!");
     }
     else if (food0.y < head.y) {
-      SnakeDoMove(pMoveOutput, UP, "Going up up up!!!");
+      SnakeDoMove(pMoveOutput, DIR_UP, "Going up up up!!!");
     }
     else if (food0.x < head.x) {
-      SnakeDoMove(pMoveOutput, LEFT, "Left we go!!!");
+      SnakeDoMove(pMoveOutput, DIR_LEFT, "Left we go!!!");
     }
     else {
-      SnakeDoMove(pMoveOutput, RIGHT, "Food!!! Yummy!");
+      SnakeDoMove(pMoveOutput, DIR_RIGHT, "Food!!! Yummy!");
     }
   }
 }

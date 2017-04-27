@@ -70,10 +70,11 @@ typedef void(*SnakeStartFn)(
 
 // Snake directions
 typedef enum {
-  UP = 0,
-  LEFT = 1,
-  DOWN = 2,
-  RIGHT = 3
+  DIR_UP = 0,
+  DIR_LEFT = 1,
+  DIR_DOWN = 2,
+  DIR_RIGHT = 3,
+  DIR_NUM = 4
 } SnakeDirectionE;
 
 typedef struct CoordsTag {

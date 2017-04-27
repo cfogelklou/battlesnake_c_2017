@@ -20,12 +20,13 @@ if (EMSCRIPTEN)
     add_definitions(-D__EMSCRIPTEN__)
 endif (EMSCRIPTEN)
 
-file(GLOB STUPID_SNAKE_SRC
+file(GLOB SNAKE_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/stupid_snake/*.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/smart_snake/*.c
 )
 
 set(APP_SOURCE_FILES
-    ${STUPID_SNAKE_SRC}
+    ${SNAKE_SRCS}
 
     ${CMAKE_CURRENT_SOURCE_DIR}/main.c
     ${CMAKE_CURRENT_SOURCE_DIR}/snake_c_utils.cpp
