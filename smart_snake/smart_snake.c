@@ -1,4 +1,4 @@
-#include "stupid_snake.h"
+#include "smart_snake.h"
 #include "snake_c_utils.h"
 #include <stddef.h>
 #include <stdio.h>
@@ -72,7 +72,7 @@ static void snake_move(
   }
 }
 
-const SnakeCallbacks stupid_snake = {
+const SnakeCallbacks smart_snake = {
   snake_start,
   snake_move
 };
