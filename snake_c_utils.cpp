@@ -39,9 +39,9 @@ const char * SnakeTailStr(const SnakeTailTypeE tail) {
 // See header file for description.
 const char * SnakeDirStr(const SnakeDirectionE dir) {
   switch (dir) {
-  case UP: return "up";
-  case DOWN: return "down";
-  case LEFT: return "left";
+  case DIR_UP: return "up";
+  case DIR_DOWN: return "down";
+  case DIR_LEFT: return "left";
   default: return "right";
   };
 }
@@ -108,7 +108,7 @@ void SnakeBattlefieldUpdate(Battlefield * const pBattlefield, const MoveInput * 
     //for (auto& pt : snake.coords) {
     for (int p = 0; p < snake.numCoords; p++) {
       Coords &pt = snake.coordsArr[p];
-      battlefield[pt.x + pt.y*width] = c;
+      battlefield[pt.x + pt.y*width] = (0 == p) ? (c - 'a' + 'A') : c;
     }
     c++;
   }

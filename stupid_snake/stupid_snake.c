@@ -41,7 +41,7 @@ static void snake_move(
   printf("Got move for game %s!\r\n", pGameId);
 
   if (pMoveInput->numFood <= 0) {
-    SnakeDoMove(pMoveOutput, DOWN, "No food!  Let's go DOOOWN!");
+    SnakeDoMove(pMoveOutput, DIR_DOWN, "No food!  Let's go DOOOWN!");
   }
   else {
 
@@ -58,16 +58,16 @@ static void snake_move(
     SnakeBattlefieldFree(pB);
 
     if (food0.y > head.y) {
-      SnakeDoMove(pMoveOutput, DOWN, "Watch out! Going down!!!");
+      SnakeDoMove(pMoveOutput, DIR_DOWN, "Watch out! Going down!!!");
     }
     else if (food0.y < head.y) {
-      SnakeDoMove(pMoveOutput, UP, "Going up up up!!!");
+      SnakeDoMove(pMoveOutput, DIR_UP, "Going up up up!!!");
     }
     else if (food0.x < head.x) {
-      SnakeDoMove(pMoveOutput, LEFT, "Left we go!!!");
+      SnakeDoMove(pMoveOutput, DIR_LEFT, "Left we go!!!");
     }
     else {
-      SnakeDoMove(pMoveOutput, RIGHT, "Food!!! Yummy!");
+      SnakeDoMove(pMoveOutput, DIR_RIGHT, "Food!!! Yummy!");
     }
   }
 }

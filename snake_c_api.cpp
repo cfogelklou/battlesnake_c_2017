@@ -276,7 +276,7 @@ std::string SnakeMoveListener::parseMove(const char * const cbuf) {
     // If the move function is defined, call it.
     if ((mpSnake) && (mpSnake->Move)) {
       MoveInput moveInput = { 0 };
-      MoveOutput moveOutput = { UP };
+      MoveOutput moveOutput = { DIR_UP };
 
       const nlohmann::json req = nlohmann::json::parse(cbuf);
 
