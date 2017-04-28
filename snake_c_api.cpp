@@ -417,13 +417,14 @@ bool SnakeMoveListener::nextMove() {
     }
     else if (iResult == 0) {
       // Do nothing, just exit...
+      Sleep(10);
     }
     else {
       std::cerr << "recv failed with error" << std::endl;
       SnakeSng::inst().sockClose(clientSocket);
     }
 
-  } while (iResult > 0);
+  } while (iResult >= 0);
 
   // shutdown the connection since we're done
   iResult = SnakeSng::inst().sockClose(clientSocket);
