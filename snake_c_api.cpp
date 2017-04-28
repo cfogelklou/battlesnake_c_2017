@@ -95,6 +95,8 @@ public:
   std::string handleReceive(std::string &rxBuf, const int recvbuflen);
   bool nextMove();
 
+  static void ThreadCb(void *pUserData);
+  void Moving(SOCKET clientSocket);
 
 private:
   SOCKET ListenSocket = INVALID_SOCKET;
@@ -377,20 +379,25 @@ std::string SnakeMoveListener::handleReceive(std::string &rxBuf, const int recvb
 
 }
 
+#include "osal.h"
+
+typedef struct {
+  SnakeMoveListener *pThis;
+  SOCKET clientSocket;
+} MoveListenerThreadData;
+
 // //////////////////////////////////////////////////////////////////////////
-bool SnakeMoveListener::nextMove() {
-  int iResult = 0;
+void SnakeMoveListener::ThreadCb(void *pUserData) {
+  MoveListenerThreadData *p = (MoveListenerThreadData *)pUserData;
+  p->pThis->Moving(p->clientSocket);
 
-  bool rval = true;
+  free(p);
+}
 
-  // Accept a client socket
-  SOCKET clientSocket = accept(ListenSocket, NULL, NULL);
-  if (clientSocket == INVALID_SOCKET) {
-    std::cerr << "accept failed with error" << std::endl;
-    return false;
-  }
-
+// //////////////////////////////////////////////////////////////////////////
+void SnakeMoveListener::Moving(SOCKET clientSocket) {
   // Receive until the peer shuts down the connection
+  int iResult = 1;
   do {
     iResult = recv(clientSocket, recvbuf, recvbuflen - 1, 0);
     if (iResult > 0) {
@@ -417,14 +424,13 @@ bool SnakeMoveListener::nextMove() {
     }
     else if (iResult == 0) {
       // Do nothing, just exit...
-      Sleep(10);
     }
     else {
       std::cerr << "recv failed with error" << std::endl;
       SnakeSng::inst().sockClose(clientSocket);
     }
 
-  } while (iResult >= 0);
+  } while (iResult > 0);
 
   // shutdown the connection since we're done
   iResult = SnakeSng::inst().sockClose(clientSocket);
@@ -435,6 +441,25 @@ bool SnakeMoveListener::nextMove() {
 
   // cleanup
   SnakeSng::inst().sockClose(clientSocket);
+
+}
+
+// //////////////////////////////////////////////////////////////////////////
+bool SnakeMoveListener::nextMove() {
+  int iResult = 0;
+  bool rval = true;
+
+  // Accept a client socket
+  SOCKET clientSocket = accept(ListenSocket, NULL, NULL);
+  if (clientSocket == INVALID_SOCKET) {
+    std::cerr << "accept failed with error" << std::endl;
+    return false;
+  }
+
+  MoveListenerThreadData *pThreadData = (MoveListenerThreadData *)malloc(sizeof(MoveListenerThreadData));
+  pThreadData->clientSocket = clientSocket;
+  pThreadData->pThis = this;
+  OSALStartThread(ThreadCb, pThreadData);
 
   return rval;
 }
