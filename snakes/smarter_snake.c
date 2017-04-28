@@ -1,9 +1,12 @@
 #include "smarter_snake.h"
 #include "snake_c_utils.h"
 #include <stddef.h>
-#include <math.h>
 #include <stdio.h>
 #include <string.h>
+
+#ifndef ABS
+#define ABS(x) ((x) < 0) ? (-(x)) : (x)
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -54,7 +57,6 @@ static void snake_move(
   const Coords myHead = pMe->coordsArr[0];
 
 
-
   // Print the current battlefield.
   Battlefield * const pB = SnakeBattlefieldAllocAndUpdate(pMoveInput);
   //SnakeBattlefieldPrint(pB);
@@ -69,7 +71,7 @@ static void snake_move(
     Coords f = pMoveInput->foodArr[fI];
     int a = f.x - myHead.x;
     int b = f.y - myHead.y;
-    int distance = abs(a) + abs(b);
+    int distance = ABS(a) + ABS(b);
     if (distance < minDistance) {
       closestFood = f;
       minDistance = distance;

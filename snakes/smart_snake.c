@@ -5,6 +5,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifndef ABS
+#define ABS(x) ((x) < 0) ? (-(x)) : (x)
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -53,8 +57,6 @@ static void snake_move(
   Snake * const pMe = &pMoveInput->snakesArr[pMoveInput->yourSnakeIdx];
   const Coords myHead = pMe->coordsArr[0];
 
-
-
   // Print the current battlefield.
   Battlefield * const pB = SnakeBattlefieldAllocAndUpdate(pMoveInput);
   SnakeBattlefieldPrint(pB);
@@ -90,7 +92,7 @@ static void snake_move(
     int b = closestFood.y - myHead.y;
 
     //if (abs(a) > abs(b) && (allowedMoves.count(Direction::right) || allowedMoves.count(Direction::left))) {
-    if ((abs(a) > abs(b)) && (r || l)) {
+    if ((ABS(a) > ABS(b)) && (r || l)) {
       // Try to close in on x axis
       if (closestFood.x > myHead.x && (r)) {
         heading = DIR_RIGHT;
