@@ -21,8 +21,7 @@ if (EMSCRIPTEN)
 endif (EMSCRIPTEN)
 
 file(GLOB SNAKE_SRCS
-    ${CMAKE_CURRENT_SOURCE_DIR}/stupid_snake/*.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/smart_snake/*.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/snakes/*.c
 )
 
 set(APP_SOURCE_FILES
