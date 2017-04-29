@@ -5,7 +5,7 @@
 #include <string.h>
 
 #ifndef ABS
-#define ABS(x) ((x) < 0) ? (-(x)) : (x)
+#define ABS(x) (((x) < 0) ? 0-x : x)
 #endif
 
 #ifdef __cplusplus
@@ -59,14 +59,13 @@ static void snake_move(
 
   // Print the current battlefield.
   Battlefield * const pB = SnakeBattlefieldAllocAndUpdate(pMoveInput);
-  //SnakeBattlefieldPrint(pB);
 
   // Assuming 'you' is the index of my snake
   char * const battlefield = pB->battlefieldArr;
 
   // Find closest food
   Coords closestFood;
-  int minDistance = height + width + 1;
+  int minDistance = 10000000;
   for (int fI = 0; fI < pMoveInput->numFood; fI++) {
     Coords f = pMoveInput->foodArr[fI];
     int a = f.x - myHead.x;
@@ -79,6 +78,7 @@ static void snake_move(
   }
   battlefield[closestFood.x + closestFood.y * width] = '#';
   printf("my pos: [%d,%d] food:[%d,%d]\r\n", myHead.x, myHead.y, closestFood.x, closestFood.y);
+  SnakeBattlefieldPrint(pB);
 
   //set<Direction> allowedMoves;
   const bool d = SnakeBattlefieldIsAllowedMove(pB, myHead.x, myHead.y + 1);

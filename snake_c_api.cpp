@@ -37,7 +37,7 @@ typedef int SOCKET;
 #include <sstream>
 #include <assert.h>
 
-static const int DEFAULT_BUFLEN = 65536;
+static const int DEFAULT_BUFLEN = 32768;
 
 // ////////////////////////////////////////////////////////////////////////////
 class SnakeSng {
@@ -79,17 +79,9 @@ public:
     return status;
   }
 
-  void lock(){
-	  //mMutex.lock();
-  }
-
-  void unlock(){
-	  //mMutex.unlock();
-  }
-
 private:
   static SnakeSng *mpInst;
-  std::mutex mMutex;
+
 };
 
 // Singleton instance
@@ -98,10 +90,10 @@ SnakeSng *SnakeSng::mpInst = NULL;
 class SnakeMoveListener;
 
 typedef struct {
-  SnakeMoveListener *pThis;
-  SOCKET clientSocket;
-  char recvbuf[DEFAULT_BUFLEN];
-  int recvbuflen;
+  SnakeMoveListener *pThis = NULL;
+  SOCKET clientSocket = 0;
+  int recvbuflen = DEFAULT_BUFLEN;
+  char recvbuf[DEFAULT_BUFLEN] = { 0 };
 } MoveListenerThreadData;
 
 // ////////////////////////////////////////////////////////////////////////////
@@ -123,6 +115,7 @@ private:
 
   const SnakeCallbacks *mpSnake;
   void *mpUserData;
+  std::mutex mMutex;
 
 };
 
@@ -199,9 +192,9 @@ std::string SnakeMoveListener::parseStart(const char * const cbuf) {
       const std::string game_id = req["game_id"].get<std::string>();
       auto width = req["width"].get<int>();
       auto height = req["height"].get<int>();
-      SnakeSng::inst().lock();
+      mMutex.lock();
       mpSnake->Start(mpUserData, game_id.c_str(), width, height, &out);
-      SnakeSng::inst().unlock();
+      mMutex.unlock();
     }
   }
   catch (std::exception& e) {
@@ -335,9 +328,9 @@ std::string SnakeMoveListener::parseMove(const char * const cbuf) {
       moveInput.width = req["width"].get<int>();
       moveInput.height = req["height"].get<int>();
 
-      SnakeSng::inst().lock();
+      mMutex.lock();
       mpSnake->Move(mpUserData, game_id.c_str(), &moveInput, &moveOutput);
-      SnakeSng::inst().unlock();
+      mMutex.unlock();
       
       // Handle output of the move call
       rval["move"] = SnakeDirStr(moveOutput.dir);
@@ -409,7 +402,7 @@ void ThreadCb(MoveListenerThreadData *p) {
 
   p->pThis->Moving(*p);
 
-  free(p);
+  delete p;
 }
 
 // //////////////////////////////////////////////////////////////////////////
@@ -442,12 +435,12 @@ void SnakeMoveListener::Moving(MoveListenerThreadData &sd) {
     }
     else if (iResult == 0) {
       // Do nothing, just exit...
+      //std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     else {
       std::cerr << "recv failed with error" << std::endl;
       SnakeSng::inst().sockClose(sd.clientSocket);
     }
-
   } while (iResult > 0);
 
   // shutdown the connection since we're done
@@ -474,7 +467,7 @@ bool SnakeMoveListener::nextMove() {
     return false;
   }
 
-  MoveListenerThreadData *pThreadData = (MoveListenerThreadData *)malloc(sizeof(MoveListenerThreadData));
+  MoveListenerThreadData *pThreadData = new MoveListenerThreadData;
   pThreadData->clientSocket = clientSocket;
   pThreadData->pThis = this;
   pThreadData->recvbuflen = sizeof(pThreadData->recvbuf);
