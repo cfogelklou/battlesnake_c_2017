@@ -6,6 +6,8 @@
 
 #include "snake_c_api.h"
 #include "snake_c_utils.h"
+#include <thread>
+#include <mutex>
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -77,12 +79,30 @@ public:
     return status;
   }
 
+  void lock(){
+	  //mMutex.lock();
+  }
+
+  void unlock(){
+	  //mMutex.unlock();
+  }
+
 private:
   static SnakeSng *mpInst;
+  std::mutex mMutex;
 };
 
 // Singleton instance
 SnakeSng *SnakeSng::mpInst = NULL;
+
+class SnakeMoveListener;
+
+typedef struct {
+  SnakeMoveListener *pThis;
+  SOCKET clientSocket;
+  char recvbuf[DEFAULT_BUFLEN];
+  int recvbuflen;
+} MoveListenerThreadData;
 
 // ////////////////////////////////////////////////////////////////////////////
 class SnakeMoveListener {
@@ -95,14 +115,12 @@ public:
   std::string handleReceive(std::string &rxBuf, const int recvbuflen);
   bool nextMove();
 
-  static void ThreadCb(void *pUserData);
-  void Moving(SOCKET clientSocket);
+  void Moving(MoveListenerThreadData &sd);
 
 private:
   SOCKET ListenSocket = INVALID_SOCKET;
 
-  char recvbuf[DEFAULT_BUFLEN];
-  int recvbuflen = DEFAULT_BUFLEN;
+
   const SnakeCallbacks *mpSnake;
   void *mpUserData;
 
@@ -181,7 +199,9 @@ std::string SnakeMoveListener::parseStart(const char * const cbuf) {
       const std::string game_id = req["game_id"].get<std::string>();
       auto width = req["width"].get<int>();
       auto height = req["height"].get<int>();
+      SnakeSng::inst().lock();
       mpSnake->Start(mpUserData, game_id.c_str(), width, height, &out);
+      SnakeSng::inst().unlock();
     }
   }
   catch (std::exception& e) {
@@ -315,7 +335,9 @@ std::string SnakeMoveListener::parseMove(const char * const cbuf) {
       moveInput.width = req["width"].get<int>();
       moveInput.height = req["height"].get<int>();
 
+      SnakeSng::inst().lock();
       mpSnake->Move(mpUserData, game_id.c_str(), &moveInput, &moveOutput);
+      SnakeSng::inst().unlock();
       
       // Handle output of the move call
       rval["move"] = SnakeDirStr(moveOutput.dir);
@@ -379,31 +401,27 @@ std::string SnakeMoveListener::handleReceive(std::string &rxBuf, const int recvb
 
 }
 
-#include "osal.h"
 
-typedef struct {
-  SnakeMoveListener *pThis;
-  SOCKET clientSocket;
-} MoveListenerThreadData;
+
 
 // //////////////////////////////////////////////////////////////////////////
-void SnakeMoveListener::ThreadCb(void *pUserData) {
-  MoveListenerThreadData *p = (MoveListenerThreadData *)pUserData;
-  p->pThis->Moving(p->clientSocket);
+void ThreadCb(MoveListenerThreadData *p) {
+
+  p->pThis->Moving(*p);
 
   free(p);
 }
 
 // //////////////////////////////////////////////////////////////////////////
-void SnakeMoveListener::Moving(SOCKET clientSocket) {
+void SnakeMoveListener::Moving(MoveListenerThreadData &sd) {
   // Receive until the peer shuts down the connection
   int iResult = 1;
   do {
-    iResult = recv(clientSocket, recvbuf, recvbuflen - 1, 0);
+    iResult = recv(sd.clientSocket, sd.recvbuf, sd.recvbuflen - 1, 0);
     if (iResult > 0) {
-      recvbuf[iResult] = 0;
+      sd.recvbuf[iResult] = 0;
       printf("Bytes received: %d\n", iResult);
-      std::string rxBuf = recvbuf;
+      std::string rxBuf = sd.recvbuf;
       std::string response = handleReceive(rxBuf, iResult);
       response.append("\r\n");
       // Echo the buffer back to the sender
@@ -415,10 +433,10 @@ void SnakeMoveListener::Moving(SOCKET clientSocket) {
         "Content-Length: " << response.length() << "\r\n\r\n"
         << response;
       const std::string s = sstream.str();
-      int iSendResult = send(clientSocket, s.c_str(), s.length(), 0);
+      int iSendResult = send(sd.clientSocket, s.c_str(), s.length(), 0);
       if (iSendResult == SOCKET_ERROR) {
         std::cerr << "send failed with error" << std::endl;
-        SnakeSng::inst().sockClose(clientSocket);
+        SnakeSng::inst().sockClose(sd.clientSocket);
       }
       printf("Bytes sent: %d\n", iSendResult);
     }
@@ -427,20 +445,20 @@ void SnakeMoveListener::Moving(SOCKET clientSocket) {
     }
     else {
       std::cerr << "recv failed with error" << std::endl;
-      SnakeSng::inst().sockClose(clientSocket);
+      SnakeSng::inst().sockClose(sd.clientSocket);
     }
 
   } while (iResult > 0);
 
   // shutdown the connection since we're done
-  iResult = SnakeSng::inst().sockClose(clientSocket);
+  iResult = SnakeSng::inst().sockClose(sd.clientSocket);
   if (iResult == SOCKET_ERROR) {
     std::cerr << "shutdown failed with error" << std::endl;
-    SnakeSng::inst().sockClose(clientSocket);
+    SnakeSng::inst().sockClose(sd.clientSocket);
   }
 
   // cleanup
-  SnakeSng::inst().sockClose(clientSocket);
+  SnakeSng::inst().sockClose(sd.clientSocket);
 
 }
 
@@ -459,8 +477,10 @@ bool SnakeMoveListener::nextMove() {
   MoveListenerThreadData *pThreadData = (MoveListenerThreadData *)malloc(sizeof(MoveListenerThreadData));
   pThreadData->clientSocket = clientSocket;
   pThreadData->pThis = this;
-  OSALStartThread(ThreadCb, pThreadData);
-
+  pThreadData->recvbuflen = sizeof(pThreadData->recvbuf);
+  //OSALStartThread(ThreadCb, pThreadData);
+  std::thread t(ThreadCb, pThreadData); // pass by reference
+  t.detach();
   return rval;
 }
 

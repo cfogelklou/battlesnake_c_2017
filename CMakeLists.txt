@@ -28,7 +28,6 @@ set(APP_SOURCE_FILES
     ${SNAKE_SRCS}
 
     ${CMAKE_CURRENT_SOURCE_DIR}/main.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/osal.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/snake_c_utils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/snake_c_api.cpp
 )
